@@ -1,0 +1,19 @@
+backendStore:
+  databaseConnectionCheck: false
+  postgres:
+    enabled: true
+    user: mlflow
+    password: mlflow
+    database: mlflow
+artifactRoot:
+  gcs:
+    enabled: true
+    bucket: PROJECT-mlflow
+service:
+  type: ClusterIP
+  port: 5000
+serviceAccount:
+  create: true
+  name: mlflow
+  annotations:
+    iam.gke.io/gcp-service-account: training-job-sa@PROJECT.iam.gserviceaccount.com

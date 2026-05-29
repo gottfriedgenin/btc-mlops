@@ -1,0 +1,29 @@
+# KFP requires a two-pass install: cluster-scoped resources first
+# (Argo Workflows CRDs, cluster RBAC, cache-deployer SA), then namespace-scoped
+# resources (kubeflow-pipelines.yaml app). This sibling app handles the
+# cluster-scoped half. Same git tag as kubeflow-pipelines.yaml — bump both
+# together.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeflow-pipelines-cluster
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kubeflow/pipelines
+    targetRevision: 2.16.1
+    path: manifests/kustomize/cluster-scoped-resources
+  destination:
+    server: https://kubernetes.default.svc
+    # The cluster-scoped tree includes a namespace.yaml that already targets
+    # `kubeflow`. Argo's destination namespace is irrelevant for cluster-scoped
+    # CRDs/ClusterRoles but the controller still needs a value.
+    namespace: kubeflow
+  syncPolicy:
+    automated: { prune: false, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

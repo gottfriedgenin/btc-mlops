@@ -1,0 +1,8 @@
+replicaCount: 1
+persistence:
+  size: 20Gi
+  storageClassName: premium-rwo
+metrics:
+  serviceMonitor:
+    enabled: true
+    additionalLabels: { release: kube-prom }

@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeflow-pipelines
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kubeflow/pipelines
+    # Pin to a tag, not master, so upstream changes are an explicit bump in git.
+    # 2.2.0/2.4.x manifests reference gcr.io/ml-pipeline/* — Google killed that
+    # registry. 2.16.1 uses ghcr.io/kubeflow/kfp-* and replaces minio with
+    # seaweedfs (no more dead minio image). Verified all images live.
+    targetRevision: 2.16.1
+    path: manifests/kustomize/env/platform-agnostic
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubeflow
+  syncPolicy:
+    automated: { prune: false, selfHeal: true }    # KFP CRDs + jobs: don't prune on first install drift
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers: [/spec/replicas]

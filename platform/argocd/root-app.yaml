@@ -1,0 +1,27 @@
+# App-of-Apps root. Treats every YAML in platform/argocd/apps/ as a child Application.
+# Adding a new app = adding a YAML to that directory + git commit.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gottfriedgenin/btc-mlops
+    targetRevision: main
+    path: platform/argocd/apps
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

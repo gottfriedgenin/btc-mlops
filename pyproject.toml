@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "btc-mlops"
+version = "0.1.0"
+description = ""
+authors = ["you <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2"
+numpy = "^1.26"
+pyarrow = "^16"
+requests = "^2.32"
+gcsfs = "^2024.6"
+google-cloud-storage = "^2.16"
+torch = "^2.3"
+scikit-learn = "^1.5"
+mlflow = "^2.14"
+fastapi = "^0.111"
+uvicorn = "^0.30"
+prometheus-client = "^0.20"
+grpcio = "^1.64"
+grpcio-tools = "^1.64"
+sentence-transformers = "^3.0"
+qdrant-client = "^1.10"
+google-cloud-bigquery = "^3.25"
+pandas-gbq = "^0.23"
+db-dtypes = "^1.2"
+kfp = "^2.7"
+httpx = "^0.27"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8"
+ruff = "^0.5"
+mypy = "^1.10"
+jupyterlab = "^4.2"
+ipykernel = "^6.29"
+matplotlib = "^3.9"
+seaborn = "^0.13"
+xgboost = "^2.1"
+shap = "^0.46"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

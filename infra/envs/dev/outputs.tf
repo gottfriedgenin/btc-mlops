@@ -1,0 +1,12 @@
+output "cluster_name"      { value = module.gke.cluster_name }
+output "registry_url"      { value = module.registry.registry_url }
+output "training_sa"       { value = module.iam.training_sa_email }
+output "serving_sa"        { value = module.iam.serving_sa_email }
+output "github_ci_sa"      { value = module.iam.github_ci_sa_email }
+output "wif_provider"      { value = module.iam.wif_provider }
+output "models_bucket"     { value = module.storage.models }
+output "features_bucket"   { value = module.storage.data_features }
+output "docs_bucket"       { value = module.storage.docs }
+output "mlflow_bucket"     { value = module.storage.mlflow }
+output "bq_dataset"        { value = module.bigquery.dataset_id }
+output "bq_dataset_table"  { value = module.bigquery.dataset_table_id }
