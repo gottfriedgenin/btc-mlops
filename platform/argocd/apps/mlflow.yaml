@@ -1,25 +1,52 @@
+# MLflow ApplicationSet.
+#
+# Why ApplicationSet instead of Application: the chart needs project-specific
+# values (GCS bucket, WI SA email) that should not be committed to git. We
+# read those from the in-cluster cluster Secret's `gcp_project` annotation,
+# which is set by platform/argocd/bootstrap.sh.
+#
+# Architecturally this scales — when a staging/prod cluster is added later,
+# its own Secret carries its own gcp_project annotation, and one
+# ApplicationSet renders the per-cluster Applications correctly.
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
   name: mlflow
   namespace: argocd
-  finalizers: [resources-finalizer.argocd.argoproj.io]
 spec:
-  project: default
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: mlflow
-  sources:
-    - repoURL: https://community-charts.github.io/helm-charts
-      chart: mlflow
-      targetRevision: 0.7.x
-      helm:
-        valueFiles:
-          - $values/platform/helm/values/mlflow.yaml
-    - repoURL: https://github.com/gottfriedgenin/btc-mlops
-      targetRevision: main
-      ref: values
-  syncPolicy:
-    automated: { prune: true, selfHeal: true }
-    syncOptions:
-      - CreateNamespace=true
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters: {}    # walks every registered cluster (currently just in-cluster)
+  template:
+    metadata:
+      name: 'mlflow'
+      finalizers: [resources-finalizer.argocd.argoproj.io]
+    spec:
+      project: default
+      destination:
+        server: '{{ .server }}'
+        namespace: mlflow
+      sources:
+        - repoURL: https://community-charts.github.io/helm-charts
+          chart: mlflow
+          # 0.7.x was retracted from the index; 1.x is the current line.
+          targetRevision: 1.8.x
+          helm:
+            valueFiles:
+              - $values/platform/helm/values/mlflow.yaml
+            parameters:
+              # GCS bucket created by infra/modules/storage as
+              #   <project_id>-mlflow
+              - name: artifactRoot.gcs.bucket
+                value: '{{ index .metadata.annotations "gcp_project" }}-mlflow'
+              # Workload Identity binding to the training-job-sa GCP SA
+              - name: serviceAccount.annotations.iam\.gke\.io/gcp-service-account
+                value: 'training-job-sa@{{ index .metadata.annotations "gcp_project" }}.iam.gserviceaccount.com'
+        - repoURL: https://github.com/gottfriedgenin/btc-mlops
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true

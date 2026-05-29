@@ -1,19 +1,36 @@
+# MLflow values for community-charts/mlflow chart.
+#
+# Project-specific values (GCS bucket, WI SA annotation) are NOT in this file
+# — they're injected by the ApplicationSet in platform/argocd/apps/mlflow.yaml
+# using `{{metadata.annotations.gcp_project}}` from the in-cluster Secret.
+# The cluster Secret is created and annotated by platform/argocd/bootstrap.sh
+# at install time. Project id never enters git.
+#
+# Backend store: SQLite in /tmp/mlflow.db — survives within a pod's lifetime,
+# lost on restart. To upgrade to postgres, switch the postgres block on and
+# point host at the corresponding service.
+
 backendStore:
   databaseConnectionCheck: false
+  defaultSqlitePath: "/tmp/mlflow.db"
   postgres:
-    enabled: true
-    user: mlflow
-    password: mlflow
-    database: mlflow
+    enabled: false
+  mysql:
+    enabled: false
+
 artifactRoot:
+  proxiedArtifactStorage: false
   gcs:
     enabled: true
-    bucket: PROJECT-mlflow
+    # bucket: <set via ApplicationSet helm.parameters>
+
 service:
+  enabled: true
   type: ClusterIP
   port: 5000
+  name: http
+
 serviceAccount:
   create: true
   name: mlflow
-  annotations:
-    iam.gke.io/gcp-service-account: training-job-sa@PROJECT.iam.gserviceaccount.com
+  # annotations.iam.gke.io/gcp-service-account: <set via ApplicationSet helm.parameters>
