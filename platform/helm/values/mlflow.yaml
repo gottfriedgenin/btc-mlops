@@ -36,10 +36,12 @@ serviceAccount:
   # annotations.iam.gke.io/gcp-service-account: <set via ApplicationSet helm.parameters>
 
 # MLflow 3.5+ validates the HTTP Host header and rejects unknown hosts with
-# "Invalid Host header - possible DNS rebinding attack detected". The KFP
-# pipeline talks to mlflow.mlflow.svc.cluster.local, which isn't in the
-# default allow-list (only localhost + private IP ranges).
-# Allow the in-cluster DNS name explicitly. See:
-# https://mlflow.org/docs/latest/python_api/openapi/ → MLFLOW_SERVER_ALLOWED_HOSTS
+# "Invalid Host header - possible DNS rebinding attack detected" (see
+# mlflow/server/security_utils.py:is_allowed_host_header).
+# Match is exact string comparison INCLUDING the port — unless the allow-list
+# entry contains a `*`, which switches to fnmatch. The KFP pipeline calls
+# http://mlflow.mlflow.svc.cluster.local:5000, so the in-cluster Service DNS
+# is not in the default localhost+private-IP allow-list. Wildcard so the
+# entry matches both with and without :PORT.
 extraEnvVars:
-  MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow.mlflow.svc.cluster.local,localhost,127.0.0.1"
+  MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow.mlflow.svc.cluster.local*,localhost,127.0.0.1"
