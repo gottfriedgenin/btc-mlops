@@ -27,3 +27,10 @@ spec:
     - group: apps
       kind: Deployment
       jsonPointers: [/spec/replicas]
+    # pipeline-runner SA is also managed by the kfp-workload-identity
+    # ApplicationSet, which sets the iam.gke.io/gcp-service-account annotation
+    # for Workload Identity. Stop this app from fighting over /metadata/annotations.
+    - group: ""
+      kind: ServiceAccount
+      name: pipeline-runner
+      jsonPointers: [/metadata/annotations]
