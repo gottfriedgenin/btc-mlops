@@ -86,17 +86,17 @@ def build(df: pd.DataFrame, warmup_days: int = 365) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--project",    required=True)
-    ap.add_argument("--dataset",    default="btc_raw")
-    ap.add_argument("--table",      default="dataset_unified")
-    ap.add_argument("--symbol",     default="BTCUSDT")
-    ap.add_argument("--interval",   default="1d")
-    ap.add_argument("--out-bucket", required=True)
+    ap.add_argument("--project",      required=True, help="billing project for BQ client")
+    ap.add_argument("--source-table", required=True,
+                    help="fully-qualified BQ ref, e.g. PROJECT.btc_snapshots.dataset_unified__<ts>")
+    ap.add_argument("--symbol",       default="BTCUSDT")
+    ap.add_argument("--interval",     default="1d")
+    ap.add_argument("--out-bucket",   required=True)
     a = ap.parse_args()
     cli = bigquery.Client(project=a.project)
     sql = f"""
         SELECT *
-        FROM `{a.project}.{a.dataset}.{a.table}`
+        FROM `{a.source_table}`
         WHERE symbol = @symbol AND interval = @interval
         ORDER BY timestamp
     """
