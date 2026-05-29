@@ -98,25 +98,31 @@ labels-local: ## labelled.parquet from features.parquet
 	  --task regression --horizon 3
 
 ## ─── docker images ───────────────────────────────────────────────────────
+# GKE nodes are linux/amd64. macOS arm64 must cross-build via buildx.
+# `--push` ships straight to AR without a separate `docker push`.
+PLATFORM ?= linux/amd64
+BUILDX_FLAGS = buildx build --platform $(PLATFORM)
+
+.PHONY: docker-buildx-setup
+docker-buildx-setup: ## create a buildx builder once (idempotent)
+	-docker buildx create --name btc-mlops --use 2>/dev/null
+	docker buildx inspect --bootstrap
+
 .PHONY: docker-build
-docker-build: docker-ingest docker-features docker-train docker-eval ## build all 4 images locally
+docker-build: docker-ingest docker-features docker-train docker-eval ## build+push all 4 (cross-arch)
 
 .PHONY: docker-ingest docker-features docker-train docker-eval
-docker-ingest:   ## build ingest image
-	docker build -f ci/docker/ingest.Dockerfile   -t $(REGISTRY)/ingest:$(TAG)   .
-docker-features: ## build features image
-	docker build -f ci/docker/features.Dockerfile -t $(REGISTRY)/features:$(TAG) .
-docker-train:    ## build train image
-	docker build -f ci/docker/train.Dockerfile    -t $(REGISTRY)/train:$(TAG)    .
-docker-eval:     ## build eval image
-	docker build -f ci/docker/eval.Dockerfile     -t $(REGISTRY)/eval:$(TAG)     .
+docker-ingest:   ## build+push ingest image
+	docker $(BUILDX_FLAGS) -f ci/docker/ingest.Dockerfile   -t $(REGISTRY)/ingest:$(TAG)   --push .
+docker-features: ## build+push features image
+	docker $(BUILDX_FLAGS) -f ci/docker/features.Dockerfile -t $(REGISTRY)/features:$(TAG) --push .
+docker-train:    ## build+push train image
+	docker $(BUILDX_FLAGS) -f ci/docker/train.Dockerfile    -t $(REGISTRY)/train:$(TAG)    --push .
+docker-eval:     ## build+push eval image
+	docker $(BUILDX_FLAGS) -f ci/docker/eval.Dockerfile     -t $(REGISTRY)/eval:$(TAG)     --push .
 
 .PHONY: docker-push
-docker-push: docker-build ## push all 4 to Artifact Registry
-	docker push $(REGISTRY)/ingest:$(TAG)
-	docker push $(REGISTRY)/features:$(TAG)
-	docker push $(REGISTRY)/train:$(TAG)
-	docker push $(REGISTRY)/eval:$(TAG)
+docker-push: docker-build ## alias of docker-build (buildx pushes inline)
 
 SA_KEY ?= secrets/gcp_sa.json
 
@@ -131,33 +137,26 @@ ar-auth-gcloud: ## alt: configure docker helper to use active gcloud account
 
 ## ─── KFP submit ──────────────────────────────────────────────────────────
 .PHONY: kfp-port-forward
-kfp-port-forward: ## forward KFP UI to localhost:8080 (run in another shell)
+kfp-port-forward: ## forward KFP UI → http://localhost:8080
 	kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8080:80
+
+.PHONY: mlflow-port-forward
+mlflow-port-forward: ## forward MLflow UI → http://localhost:5000
+	kubectl port-forward -n mlflow svc/mlflow 5000:5000
+
+.PHONY: argocd-port-forward
+argocd-port-forward: ## forward ArgoCD UI → https://localhost:8081
+	kubectl port-forward -n argocd svc/argocd-server 8081:443
+
+.PHONY: argocd-password
+argocd-password: ## print ArgoCD initial-admin password
+	@kubectl -n argocd get secret argocd-initial-admin-secret \
+	  -o jsonpath='{.data.password}' | base64 -d ; echo
 
 .PHONY: kfp-submit
 kfp-submit: $(PIPELINE_YML) ## submit a run against http://localhost:8080
-	$(PY) - <<-PY
-	import kfp
-	cli = kfp.Client(host="http://localhost:8080")
-	cli.create_run_from_pipeline_package(
-	    pipeline_file="$(PIPELINE_YML)",
-	    arguments={
-	        "project":          "$(PROJECT)",
-	        "bq_dataset":       "btc_raw",
-	        "bq_table":         "dataset_unified",
-	        "features_bucket":  "$(PROJECT)-data-features",
-	        "models_bucket":    "$(PROJECT)-models",
-	        "csv_path":         "/app/data/BTCUSDT_1d_merged.csv",
-	        "holdout_csv_path": "/app/data/BTCUSDT_1d_2026_holdout.csv",
-	        "holdout_table":    "dataset_unified_2026_holdout",
-	        "symbol":           "BTCUSDT",
-	        "interval":         "1d",
-	        "horizon":          3,
-	        "mlflow_uri":       "$(MLFLOW_URI)",
-	    },
-	    experiment_name="btc-quantile",
-	)
-	PY
+	PROJECT=$(PROJECT) MLFLOW_URI=$(MLFLOW_URI) PIPELINE_YML=$(PIPELINE_YML) \
+	  $(PY) scripts/kfp_submit.py
 
 ## ─── housekeeping ────────────────────────────────────────────────────────
 .PHONY: clean

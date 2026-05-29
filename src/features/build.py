@@ -94,11 +94,12 @@ def main():
     ap.add_argument("--out-bucket",   required=True)
     a = ap.parse_args()
     cli = bigquery.Client(project=a.project)
+    # `interval` is a reserved word in BQ Standard SQL — backtick it.
     sql = f"""
         SELECT *
         FROM `{a.source_table}`
-        WHERE symbol = @symbol AND interval = @interval
-        ORDER BY timestamp
+        WHERE `symbol` = @symbol AND `interval` = @interval
+        ORDER BY `timestamp`
     """
     job = cli.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("symbol",   "STRING", a.symbol),

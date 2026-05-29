@@ -4,6 +4,13 @@ variable "data_features_bucket" { type = string }
 variable "docs_bucket"          { type = string }
 variable "bq_dataset"           { type = string }
 
+# Project lookup — used to resolve project_number for the compute default SA
+# that the GKE node pools run as (image pulls happen with the node identity,
+# not the pod's Workload Identity).
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 # Service accounts soft-delete for 30 days. Recreating with the same account_id
 # during that window errors 409 and forces an undelete + import.
 # Protect the three identity-layer SAs from destroy. Flip prevent_destroy to false
@@ -79,6 +86,16 @@ resource "google_service_account_iam_member" "serving_wi" {
   service_account_id = google_service_account.serving.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "serviceAccount:${var.project_id}.svc.id.goog[serving/btc-serving]"
+}
+
+# GKE node SA: image pulls from Artifact Registry happen with the node's
+# identity, NOT the pod's Workload Identity binding. Node pools use the
+# Compute Engine default SA (<project_number>-compute@developer...), which
+# needs read access to AR to pull our private images.
+resource "google_project_iam_member" "gke_nodes_ar_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${data.google_project.this.number}-compute@developer.gserviceaccount.com"
 }
 
 # GitHub Actions CI permissions

@@ -34,7 +34,10 @@ def main():
 
     from google.cloud import bigquery
     bq = bigquery.Client()
-    df = bq.query(f"SELECT * FROM `{a.holdout_bq}` WHERE timestamp >= '2026-01-01' ORDER BY timestamp").to_dataframe()
+    df = bq.query(
+        f"SELECT * FROM `{a.holdout_bq}` "
+        f"WHERE `timestamp` >= '2026-01-01' ORDER BY `timestamp`"
+    ).to_dataframe()
     feats = build(df)
     feats = label_regression(feats, horizon=a.horizon)
 

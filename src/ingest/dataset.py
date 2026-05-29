@@ -38,10 +38,12 @@ def upsert_bq(df: pd.DataFrame, project: str, dataset: str, table: str) -> None:
     interval = df["interval"].iloc[0]
     win_start = df["timestamp"].min().isoformat()
     win_end   = df["timestamp"].max().isoformat()
+    # `interval` is a reserved word in BQ Standard SQL — backtick it (and the
+    # other identifiers for safety) so the parser treats them as column names.
     cli.query(f"""
         DELETE FROM `{table_ref}`
-        WHERE symbol = @symbol AND interval = @interval
-          AND timestamp BETWEEN TIMESTAMP(@s) AND TIMESTAMP(@e)
+        WHERE `symbol` = @symbol AND `interval` = @interval
+          AND `timestamp` BETWEEN TIMESTAMP(@s) AND TIMESTAMP(@e)
     """, job_config=bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("symbol",   "STRING", symbol),
         bigquery.ScalarQueryParameter("interval", "STRING", interval),
