@@ -2,6 +2,7 @@ variable "project_id"           { type = string }
 variable "models_bucket"        { type = string }
 variable "data_features_bucket" { type = string }
 variable "docs_bucket"          { type = string }
+variable "mlflow_bucket"        { type = string }
 variable "bq_dataset"           { type = string }
 variable "bq_snapshots_dataset" { type = string }
 
@@ -60,6 +61,16 @@ resource "google_storage_bucket_iam_member" "serving_models_read" {
   bucket = var.models_bucket
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.serving.email}"
+}
+
+# MLflow stores all run artifacts (models, plots, JSONs) under
+# gs://<project>-mlflow/. The MLflow tracking server uploads on behalf of the
+# *caller* (the KFP train pod's WI identity), not the MLflow pod, so the
+# training SA needs object write access to this bucket.
+resource "google_storage_bucket_iam_member" "training_mlflow_write" {
+  bucket = var.mlflow_bucket
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.training.email}"
 }
 
 # BigQuery — raw klines

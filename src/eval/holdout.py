@@ -38,7 +38,13 @@ def main():
         f"SELECT * FROM `{a.holdout_bq}` "
         f"WHERE `timestamp` >= '2026-01-01' ORDER BY `timestamp`"
     ).to_dataframe()
-    feats = build(df)
+    # 2026 holdout has only ~150 rows. The default 365-day warmup filter in
+    # build() would drop all of them. Pre-computed indicators (sma/ema/
+    # ichimoku/...) are already merged from the full history in the source
+    # CSV, so no additional warmup is needed — the rolling derived features
+    # warm up naturally and the final dropna() trims their NaN prefix
+    # (~60 rows for vol_60).
+    feats = build(df, warmup_days=0)
     feats = label_regression(feats, horizon=a.horizon)
 
     with tempfile.TemporaryDirectory() as td:
