@@ -1,8 +1,0 @@
-controller:
-  service:
-    type: ClusterIP
-  metrics:
-    enabled: true
-    serviceMonitor:
-      enabled: true
-      additionalLabels: { release: kube-prom }
