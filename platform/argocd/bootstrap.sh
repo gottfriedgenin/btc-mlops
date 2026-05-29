@@ -6,6 +6,10 @@
 # qdrant, KFP, btc-serving, monitoring, drift-monitor, vllm, rag-api)
 # is an Argo Application synced from git via the App-of-Apps pattern.
 #
+
+# Get GKE credentials. This is required to run kubectl commands below.
+gcloud container clusters get-credentials genops-dev --region europe-west3
+
 # Idempotent — safe to re-run.
 set -euo pipefail
 
