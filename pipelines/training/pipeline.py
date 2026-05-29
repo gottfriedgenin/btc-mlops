@@ -54,29 +54,45 @@ def features_op(project: str, source_table: str, out_bucket: str,
     )
 
 
-@dsl.container_component
-def labels_op(in_path: str, out_path: str, horizon: int = 3):
-    return dsl.ContainerSpec(
-        image=f"{REGISTRY}/features:latest",
-        command=["python","-m","src.features.labels"],
-        args=["--in-path", in_path, "--out-path", out_path,
-              "--task", "regression", "--horizon", str(horizon)],
-    )
+# Paths built INSIDE the component (not via f-string in the pipeline DAG).
+# KFP 2.16.1's runtimeValue.constant resolver only substitutes the FIRST
+# pipelinechannel--* placeholder per constant string — so an f-string with
+# both {features_bucket} and {interval} leaves one placeholder unresolved
+# at runtime. Build the path here where each input is already a real string.
+@dsl.component(base_image=f"{REGISTRY}/features:latest")
+def labels_op(features_bucket: str, interval: str, horizon: int = 3):
+    import subprocess, sys
+    in_path  = f"gs://{features_bucket}/btc/{interval}/features.parquet"
+    out_path = f"gs://{features_bucket}/btc/{interval}/labelled.parquet"
+    proc = subprocess.run([
+        "python", "-m", "src.features.labels",
+        "--in-path", in_path, "--out-path", out_path,
+        "--task", "regression", "--horizon", str(horizon),
+    ], text=True, capture_output=True)
+    sys.stdout.write(proc.stdout)
+    sys.stderr.write(proc.stderr)
+    if proc.returncode != 0:
+        raise RuntimeError(f"labels CLI exit={proc.returncode}\nSTDERR:\n{proc.stderr}")
 
 
-@dsl.container_component
-def train_op(features_uri: str, models_bucket: str, mlflow_uri: str,
-             data_snapshot: str,
+@dsl.component(base_image=f"{REGISTRY}/train:latest")
+def train_op(features_bucket: str, interval: str, models_bucket: str,
+             mlflow_uri: str, data_snapshot: str,
              train_end: str = "2024-12-31", val_end: str = "2025-09-30"):
-    return dsl.ContainerSpec(
-        image=f"{REGISTRY}/train:latest",
-        command=["python","-m","src.train.train"],
-        args=["--features-uri", features_uri,
-              "--models-bucket", models_bucket,
-              "--mlflow-uri", mlflow_uri,
-              "--data-snapshot", data_snapshot,
-              "--train-end", train_end, "--val-end", val_end],
-    )
+    import subprocess, sys
+    features_uri = f"gs://{features_bucket}/btc/{interval}/labelled.parquet"
+    proc = subprocess.run([
+        "python", "-m", "src.train.train",
+        "--features-uri", features_uri,
+        "--models-bucket", models_bucket,
+        "--mlflow-uri", mlflow_uri,
+        "--data-snapshot", data_snapshot,
+        "--train-end", train_end, "--val-end", val_end,
+    ], text=True, capture_output=True)
+    sys.stdout.write(proc.stdout)
+    sys.stderr.write(proc.stderr)
+    if proc.returncode != 0:
+        raise RuntimeError(f"train CLI exit={proc.returncode}\nSTDERR:\n{proc.stderr}")
 
 
 @dsl.component(base_image=f"{REGISTRY}/eval:latest")
@@ -159,12 +175,13 @@ def btc_pipeline(
                       symbol=symbol, interval=interval,
                       out_bucket=features_bucket).after(ing)
     lab = labels_op(
-        in_path=f"gs://{features_bucket}/btc/{interval}/features.parquet",
-        out_path=f"gs://{features_bucket}/btc/{interval}/labelled.parquet",
+        features_bucket=features_bucket,
+        interval=interval,
         horizon=horizon,
     ).after(fe)
     tr = train_op(
-        features_uri=f"gs://{features_bucket}/btc/{interval}/labelled.parquet",
+        features_bucket=features_bucket,
+        interval=interval,
         models_bucket=models_bucket,
         mlflow_uri=mlflow_uri,
         # Snapshot id lands in MLflow as `data_snapshot` for run traceability.
