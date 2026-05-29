@@ -79,6 +79,13 @@ def feature_columns(df: pd.DataFrame, exclude=None) -> list[str]:
 
 def build(df: pd.DataFrame, warmup_days: int = 365) -> pd.DataFrame:
     df = drop_dead_cols(df)
+    # Drop any column that is 100% NaN in the snapshot (e.g. adx_adx /
+    # adx_plus_di / adx_minus_di / ichimoku_chikou are present in the BQ
+    # schema but never populated upstream). Otherwise the final dropna()
+    # empties the frame and training sees 0 rows.
+    all_nan = [c for c in df.columns if df[c].isna().all()]
+    if all_nan:
+        df = df.drop(columns=all_nan)
     df = drop_indicator_warmup(df, warmup_days=warmup_days)
     df = add_derived_features(df)
     return df.dropna().reset_index(drop=True)

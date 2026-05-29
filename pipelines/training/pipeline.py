@@ -170,15 +170,23 @@ def btc_pipeline(
     ing_ho = ingest_op(project=project, dataset=bq_dataset, table=holdout_table,
                        csv_path=holdout_csv_path, symbol=symbol, interval=interval)
 
+    # Disable caching on every data-touching step. Inputs (snapshot id, paths)
+    # look identical across runs to KFP's hasher, but the underlying BQ/GCS
+    # data changes — leaving cache on would re-use stale empty parquet from a
+    # prior failed run and silently train on 0 rows.
+    ing.set_caching_options(enable_caching=False)
+    ing_ho.set_caching_options(enable_caching=False)
     fe  = features_op(project=project,
                       source_table=ing.output,
                       symbol=symbol, interval=interval,
                       out_bucket=features_bucket).after(ing)
+    fe.set_caching_options(enable_caching=False)
     lab = labels_op(
         features_bucket=features_bucket,
         interval=interval,
         horizon=horizon,
     ).after(fe)
+    lab.set_caching_options(enable_caching=False)
     tr = train_op(
         features_bucket=features_bucket,
         interval=interval,
@@ -188,11 +196,13 @@ def btc_pipeline(
         data_snapshot=ing.output,
         train_end=train_end, val_end=val_end,
     ).after(lab)
+    tr.set_caching_options(enable_caching=False)
     # XGBoost runs CPU-only; route to the cpu-burst pool, not the GPU pool.
     tr.set_cpu_limit("4").set_memory_limit("8Gi")
     # ing_ho.output is the holdout snapshot id (fully-qualified BQ ref).
     ho = holdout_op(mlflow_uri=mlflow_uri, holdout_bq=ing_ho.output,
                     models_bucket=models_bucket).after(tr, ing_ho)
+    ho.set_caching_options(enable_caching=False)
 
     # Promotion gate: holdout band is calibrated AND model beats random walk.
     # KFP 2.x dsl.If takes a single condition — nest for logical AND.
