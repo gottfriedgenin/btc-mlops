@@ -3,6 +3,7 @@ name = "btc-mlops"
 version = "0.1.0"
 description = ""
 authors = ["you <you@example.com>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -42,3 +43,6 @@ shap = "^0.46"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
