@@ -3,6 +3,7 @@ variable "models_bucket"        { type = string }
 variable "data_features_bucket" { type = string }
 variable "docs_bucket"          { type = string }
 variable "bq_dataset"           { type = string }
+variable "bq_snapshots_dataset" { type = string }
 
 # Project lookup — used to resolve project_number for the compute default SA
 # that the GKE node pools run as (image pulls happen with the node identity,
@@ -64,6 +65,12 @@ resource "google_storage_bucket_iam_member" "serving_models_read" {
 # BigQuery — raw klines
 resource "google_bigquery_dataset_iam_member" "training_bq_editor" {
   dataset_id = var.bq_dataset
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_service_account.training.email}"
+}
+# Per-run snapshots dataset (CREATE SNAPSHOT TABLE writes here).
+resource "google_bigquery_dataset_iam_member" "training_bq_snapshots_editor" {
+  dataset_id = var.bq_snapshots_dataset
   role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.training.email}"
 }

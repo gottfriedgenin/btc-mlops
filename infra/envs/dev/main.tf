@@ -44,4 +44,5 @@ module "iam" {
   data_features_bucket = module.storage.data_features
   docs_bucket          = module.storage.docs
   bq_dataset           = module.bigquery.dataset_id
+  bq_snapshots_dataset = module.bigquery.snapshots_dataset_id
 }

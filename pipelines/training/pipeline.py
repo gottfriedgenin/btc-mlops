@@ -21,15 +21,21 @@ def ingest_op(project: str, dataset: str, table: str, csv_path: str,
     """Run the ingest CLI with --snapshot; return the printed SNAPSHOT_ID line so
        downstream steps can read the immutable snapshot instead of the live table.
        csv_path points at a CSV baked into the ingest image (see ingest.Dockerfile)."""
-    import subprocess
+    import subprocess, sys
     args = ["python", "-m", "src.ingest.dataset",
             "--csv-path", csv_path,
             "--project", project, "--dataset", dataset, "--table", table,
             "--symbol", symbol, "--interval", interval,
             "--snapshot", "--snapshot-dataset", snapshot_dataset,
             "--snapshot-expiration-days", str(snapshot_expiration_days)]
-    out = subprocess.check_output(args, text=True)
-    print(out)
+    # Merge stderr into stdout so KFP's component log shows the real BQ error
+    # instead of just `CalledProcessError: exit status 1`.
+    proc = subprocess.run(args, text=True, capture_output=True)
+    sys.stdout.write(proc.stdout)
+    sys.stderr.write(proc.stderr)
+    if proc.returncode != 0:
+        raise RuntimeError(f"ingest CLI exit={proc.returncode}\nSTDERR:\n{proc.stderr}")
+    out = proc.stdout
     last = [ln for ln in out.strip().splitlines() if ln.startswith("SNAPSHOT_ID=")]
     if not last:
         raise RuntimeError("ingest did not emit SNAPSHOT_ID=... on stdout")
@@ -81,14 +87,18 @@ def holdout_op(mlflow_uri: str, holdout_bq: str, models_bucket: str
                                 ("edge_vs_naive", float)]):
     """Score the 2026 holdout once. Each field of the NamedTuple becomes its own
        KFP output channel so the promotion gate can read them individually."""
-    import subprocess, json
-    out = subprocess.check_output([
+    import subprocess, json, sys
+    proc = subprocess.run([
         "python", "-m", "src.eval.holdout",
         "--mlflow-uri", mlflow_uri,
         "--holdout-bq", holdout_bq,
         "--models-bucket", models_bucket,
-    ]).decode()
-    d = json.loads(out.strip().splitlines()[-1])
+    ], text=True, capture_output=True)
+    sys.stdout.write(proc.stdout)
+    sys.stderr.write(proc.stderr)
+    if proc.returncode != 0:
+        raise RuntimeError(f"holdout CLI exit={proc.returncode}\nSTDERR:\n{proc.stderr}")
+    d = json.loads(proc.stdout.strip().splitlines()[-1])
     return (d["run_id"], float(d["band80_cov"]), float(d["edge_vs_naive"]))
 
 
