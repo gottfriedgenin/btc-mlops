@@ -69,9 +69,11 @@ resource "google_bigquery_dataset_iam_member" "training_bq_editor" {
   member     = "serviceAccount:${google_service_account.training.email}"
 }
 # Per-run snapshots dataset (CREATE SNAPSHOT TABLE writes here).
-resource "google_bigquery_dataset_iam_member" "training_bq_snapshots_editor" {
+# dataOwner (not dataEditor) because CREATE SNAPSHOT TABLE needs
+# `bigquery.tables.deleteSnapshot` which is only in dataOwner/admin.
+resource "google_bigquery_dataset_iam_member" "training_bq_snapshots_owner" {
   dataset_id = var.bq_snapshots_dataset
-  role       = "roles/bigquery.dataEditor"
+  role       = "roles/bigquery.dataOwner"
   member     = "serviceAccount:${google_service_account.training.email}"
 }
 resource "google_project_iam_member" "training_bq_jobuser" {
