@@ -1,0 +1,13 @@
+apiVersion: v2
+name: kfp-workload-identity
+description: |
+  Tiny chart that creates the Kubernetes ServiceAccount used by KFP pipeline
+  pods in the kubeflow namespace, annotated so Workload Identity binds it to
+  the training-job-sa GCP service account.
+
+  Why this chart instead of a plain manifest: keeps the GCP project id out of
+  git. The id is templated in via Helm parameter from the ApplicationSet,
+  which reads it from the in-cluster Secret annotation.
+type: application
+version: 0.1.0
+appVersion: "1.0"

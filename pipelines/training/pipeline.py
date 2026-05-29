@@ -1,4 +1,11 @@
-"""KFP pipeline: ingest → features → labels → train → holdout_eval → register."""
+"""KFP pipeline: ingest → features → labels → train → holdout_eval → register.
+
+Workload Identity wiring: KFP launches every workflow pod with the
+`kubeflow/pipeline-runner` KSA. That KSA is annotated
+(`iam.gke.io/gcp-service-account=training-job-sa@<project>.iam.gserviceaccount.com`)
+by platform/helm/kfp-workload-identity, so all pods impersonate the GCP SA
+automatically — no per-task code needed here.
+"""
 import os
 from typing import NamedTuple
 from kfp import dsl, compiler

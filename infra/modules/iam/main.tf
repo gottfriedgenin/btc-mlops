@@ -70,7 +70,10 @@ resource "google_project_iam_member" "training_bq_jobuser" {
 resource "google_service_account_iam_member" "training_wi_kubeflow" {
   service_account_id = google_service_account.training.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[kubeflow/training-job-sa]"
+  # KFP installs the `pipeline-runner` KSA and launches every workflow pod
+  # with it. Annotating that KSA (see platform/helm/kfp-workload-identity)
+  # binds it to this GCP SA via Workload Identity.
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[kubeflow/pipeline-runner]"
 }
 resource "google_service_account_iam_member" "serving_wi" {
   service_account_id = google_service_account.serving.name

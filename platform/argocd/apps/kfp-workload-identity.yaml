@@ -1,0 +1,42 @@
+# KFP Workload Identity ApplicationSet.
+#
+# Creates the `kubeflow/training-job-sa` KSA with the iam.gke.io annotation that
+# binds it to the training-job-sa GCP service account via Workload Identity.
+# Used by every task in pipelines/training/pipeline.py (via
+# kfp.kubernetes.use_service_account_name("training-job-sa")).
+#
+# Project id stays out of git — it's pulled from the in-cluster Secret's
+# `gcp_project` annotation (set by platform/argocd/bootstrap.sh) and passed
+# into the Helm chart as `gcpProject`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kfp-workload-identity
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters: {}
+  template:
+    metadata:
+      name: 'kfp-workload-identity'
+      finalizers: [resources-finalizer.argocd.argoproj.io]
+    spec:
+      project: default
+      destination:
+        server: '{{ .server }}'
+        namespace: kubeflow
+      source:
+        repoURL: https://github.com/gottfriedgenin/btc-mlops
+        targetRevision: main
+        path: platform/helm/kfp-workload-identity
+        helm:
+          parameters:
+            - name: gcpProject
+              value: '{{ index .metadata.annotations "gcp_project" }}'
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true   # patch-merge if KFP install also defines the SA

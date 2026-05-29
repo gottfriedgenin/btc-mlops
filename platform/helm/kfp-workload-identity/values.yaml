@@ -1,0 +1,12 @@
+# Defaults. gcpProject MUST be overridden by ApplicationSet's helm.parameters
+# (rendered from the in-cluster Secret's gcp_project annotation). Leaving the
+# placeholder here makes a missing override obvious.
+
+namespace: kubeflow
+# KFP installs `pipeline-runner` and launches every workflow pod with it. We
+# patch that SA (Argo wins on the annotation via ServerSideApply) instead of
+# creating a new KSA — that way no per-task code change is needed in
+# pipelines/training/pipeline.py.
+ksaName: pipeline-runner
+gcpProject: PROJECT-ID-MUST-BE-SET-BY-APPLICATIONSET
+gcpServiceAccount: training-job-sa
