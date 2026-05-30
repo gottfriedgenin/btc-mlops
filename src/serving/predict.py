@@ -103,12 +103,23 @@ class Predictor:
         feats = build(df, warmup_days=0)
         if feats.empty:
             raise RuntimeError("features empty after build() — check source data")
-        last = feats.iloc[[-1]]
+        last = feats.iloc[[-1]].copy()
 
         with self._lock:
-            band     = self._triple.predict_band(last)
+            triple   = self._triple
             version  = self._version
             run_id   = self._run_id
+
+        # Reindex live features to the model's training schema. Columns that
+        # ended up 100%-NaN in the lookback window (and were auto-dropped by
+        # build()) get re-added as NaN — XGBoost handles missing values natively.
+        missing = [c for c in triple.features if c not in last.columns]
+        if missing:
+            log.warning(f"live features missing {len(missing)} cols vs model schema: {missing}")
+            for c in missing:
+                last[c] = np.nan
+
+        band = triple.predict_band(last)
 
         last_ts    = last["timestamp"].iloc[0]
         last_close = float(last["close"].iloc[0])
