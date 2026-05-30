@@ -22,6 +22,13 @@ spec:
     metadata:
       name: 'kfp-workload-identity'
       finalizers: [resources-finalizer.argocd.argoproj.io]
+      annotations:
+        # Sync AFTER kubeflow-pipelines (sync-wave -1) so the upstream KFP
+        # manifest creates the pipeline-runner SA first, then this app patches
+        # the iam.gke.io annotation on top. Otherwise kubeflow-pipelines'
+        # later sync races and wipes the annotation, hitting the autoHeal
+        # attempt limit before recovering.
+        argocd.argoproj.io/sync-wave: "1"
     spec:
       project: default
       destination:

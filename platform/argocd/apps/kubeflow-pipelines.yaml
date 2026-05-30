@@ -4,6 +4,12 @@ metadata:
   name: kubeflow-pipelines
   namespace: argocd
   finalizers: [resources-finalizer.argocd.argoproj.io]
+  annotations:
+    # Sync FIRST. kfp-workload-identity must apply its annotation AFTER this
+    # app creates the pipeline-runner SA, otherwise selfHeal here races and
+    # strips the WI annotation. Pair with sync-wave "1" on
+    # kfp-workload-identity.yaml.
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: default
   source:

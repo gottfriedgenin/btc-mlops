@@ -67,6 +67,45 @@ kubectl -n argocd annotate secret in-cluster gcp_project="$GCP_PROJECT" --overwr
 # 4) Apply the App-of-Apps root. From here on, every commit to main triggers a reconcile.
 kubectl apply -f root-app.yaml
 
+# 5) Belt-and-suspenders: enforce the pipeline-runner SA WI annotation.
+#    The declarative path (kubeflow-pipelines sync-wave=-1, then
+#    kfp-workload-identity sync-wave=1 with ignoreDifferences on the SA
+#    annotations field in kubeflow-pipelines.yaml) is the primary fix.
+#    On a cold cluster, the first reconcile cycle still races sometimes —
+#    kubeflow-pipelines may sync, install the SA without our annotation,
+#    and SelfHeal kicks in before kfp-workload-identity has a chance. So we
+#    poll until both Apps are Synced+Healthy, then explicitly annotate.
+#    This step is idempotent: if the annotation is already there, --overwrite
+#    is a no-op write.
+echo
+echo "5) Waiting for kubeflow-pipelines + kfp-workload-identity to converge..."
+TIMEOUT=600
+INTERVAL=10
+elapsed=0
+while : ; do
+  KFP_SYNC=$(kubectl get applications.argoproj.io -n argocd kubeflow-pipelines    -o jsonpath='{.status.sync.status}'    2>/dev/null || echo "")
+  WI_SYNC=$(kubectl  get applications.argoproj.io -n argocd kfp-workload-identity -o jsonpath='{.status.sync.status}'    2>/dev/null || echo "")
+  KFP_NS_EXISTS=$(kubectl get ns kubeflow -o name 2>/dev/null || echo "")
+  SA_EXISTS=$(kubectl get sa -n kubeflow pipeline-runner -o name 2>/dev/null || echo "")
+  echo "  [$elapsed s] kubeflow-pipelines=$KFP_SYNC  kfp-workload-identity=$WI_SYNC  SA=$([ -n "$SA_EXISTS" ] && echo yes || echo no)"
+  if [ -n "$SA_EXISTS" ] && [ "$KFP_SYNC" = "Synced" ]; then
+    break
+  fi
+  if [ $elapsed -ge $TIMEOUT ]; then
+    echo "WARNING: timed out waiting for kubeflow-pipelines + pipeline-runner SA. Continuing." >&2
+    break
+  fi
+  sleep $INTERVAL
+  elapsed=$(( elapsed + INTERVAL ))
+done
+
+if [ -n "$SA_EXISTS" ]; then
+  echo "  Annotating pipeline-runner SA for Workload Identity..."
+  kubectl annotate sa pipeline-runner -n kubeflow \
+    "iam.gke.io/gcp-service-account=training-job-sa@${GCP_PROJECT}.iam.gserviceaccount.com" \
+    --overwrite
+fi
+
 cat <<EOF
 
 ArgoCD installed. Initial admin password:
