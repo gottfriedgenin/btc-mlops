@@ -1,0 +1,31 @@
+# Defaults. gcpProject + modelsBucket MUST be overridden by the
+# ApplicationSet's helm.parameters block (rendered from the in-cluster
+# `in-cluster` Secret's gcp_project annotation). Leaving placeholders here
+# makes a missing override obvious at install time.
+
+namespace: serving
+ksaName:   btc-serving
+
+gcpProject:        PROJECT-ID-MUST-BE-SET-BY-APPLICATIONSET
+gcpServiceAccount: serving-sa
+# Pattern: ${gcpProject}-models — the ApplicationSet derives this from
+# gcpProject below, so this value is set at template time.
+modelsBucket:      ""
+
+image:
+  repository: ""   # set by ApplicationSet: ${region}-docker.pkg.dev/${gcpProject}/btc-mlops/serving
+  tag:        latest
+  pullPolicy: Always
+
+replicas: 1
+
+resources:
+  requests: { cpu: "200m", memory: "512Mi" }
+  limits:   { cpu: "1",    memory: "2Gi"   }
+
+mlflowUri:            "http://mlflow.mlflow.svc.cluster.local:5000"
+modelRefreshSeconds:  600
+
+service:
+  type: ClusterIP
+  port: 8000

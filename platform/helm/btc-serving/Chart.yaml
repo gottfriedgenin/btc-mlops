@@ -1,0 +1,6 @@
+apiVersion: v2
+name: btc-serving
+description: BTC quantile forecast HTTP serving (FastAPI + MLflow registry pull)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

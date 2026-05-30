@@ -109,9 +109,9 @@ docker-buildx-setup: ## create a buildx builder once (idempotent)
 	docker buildx inspect --bootstrap
 
 .PHONY: docker-build
-docker-build: docker-ingest docker-features docker-train docker-eval ## build+push all 4 (cross-arch)
+docker-build: docker-ingest docker-features docker-train docker-eval docker-serving ## build+push all 5 (cross-arch)
 
-.PHONY: docker-ingest docker-features docker-train docker-eval
+.PHONY: docker-ingest docker-features docker-train docker-eval docker-serving
 docker-ingest:   ## build+push ingest image
 	docker $(BUILDX_FLAGS) -f ci/docker/ingest.Dockerfile   -t $(REGISTRY)/ingest:$(TAG)   --push .
 docker-features: ## build+push features image
@@ -120,6 +120,8 @@ docker-train:    ## build+push train image
 	docker $(BUILDX_FLAGS) -f ci/docker/train.Dockerfile    -t $(REGISTRY)/train:$(TAG)    --push .
 docker-eval:     ## build+push eval image
 	docker $(BUILDX_FLAGS) -f ci/docker/eval.Dockerfile     -t $(REGISTRY)/eval:$(TAG)     --push .
+docker-serving:  ## build+push serving image
+	docker $(BUILDX_FLAGS) -f ci/docker/serving.Dockerfile  -t $(REGISTRY)/serving:$(TAG)  --push .
 
 .PHONY: docker-push
 docker-push: docker-build ## alias of docker-build (buildx pushes inline)
@@ -147,6 +149,14 @@ mlflow-port-forward: ## forward MLflow UI → http://localhost:5000
 .PHONY: argocd-port-forward
 argocd-port-forward: ## forward ArgoCD UI → https://localhost:8081
 	kubectl port-forward -n argocd svc/argocd-server 8081:443
+
+.PHONY: serving-port-forward
+serving-port-forward: ## forward btc-serving → http://localhost:8000
+	kubectl port-forward -n serving svc/btc-serving 8000:8000
+
+.PHONY: serving-predict
+serving-predict: ## hit /predict (run `make serving-port-forward` in another shell first)
+	curl -s http://localhost:8000/predict | python -m json.tool
 
 .PHONY: argocd-password
 argocd-password: ## print ArgoCD initial-admin password

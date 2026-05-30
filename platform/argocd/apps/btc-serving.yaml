@@ -1,18 +1,47 @@
+# BTC serving — Phase 5.
+#
+# FastAPI app that:
+#   - loads the Production-stage `btc-quantile` model from the MLflow registry
+#   - pulls the latest features from BigQuery on every /predict
+#   - refreshes the model from MLflow every MODEL_REFRESH_SECONDS
+#
+# Project id stays out of git — pulled from the in-cluster Secret annotation
+# the same way the kfp-workload-identity ApplicationSet does it (see
+# bootstrap.sh). The helm chart's `modelsBucket` is derived from `gcpProject`
+# (Terraform names the bucket `${project}-models`).
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
   name: btc-serving
   namespace: argocd
-  finalizers: [resources-finalizer.argocd.argoproj.io]
 spec:
-  project: default
-  source:
-    repoURL: https://github.com/gottfriedgenin/btc-mlops
-    targetRevision: main
-    path: k8s/base/serving
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: serving
-  syncPolicy:
-    automated: { prune: true, selfHeal: true }
-    syncOptions: [CreateNamespace=true]
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters: {}
+  template:
+    metadata:
+      name: 'btc-serving'
+      finalizers: [resources-finalizer.argocd.argoproj.io]
+    spec:
+      project: default
+      destination:
+        server: '{{ .server }}'
+        namespace: serving
+      source:
+        repoURL: https://github.com/gottfriedgenin/btc-mlops
+        targetRevision: main
+        path: platform/helm/btc-serving
+        helm:
+          parameters:
+            - name: gcpProject
+              value: '{{ index .metadata.annotations "gcp_project" }}'
+            - name: modelsBucket
+              value: '{{ index .metadata.annotations "gcp_project" }}-models'
+            - name: image.repository
+              value: 'europe-west3-docker.pkg.dev/{{ index .metadata.annotations "gcp_project" }}/btc-mlops/serving'
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btc-serving
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: btc-serving
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels: { app: btc-serving }
+  template:
+    metadata:
+      labels: { app: btc-serving }
+      annotations:
+        # Surface prom metrics via the kube-prometheus stack without needing a
+        # ServiceMonitor; remove these once Phase 8 adds a proper ServiceMonitor.
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "8000"
+        prometheus.io/path:   "/metrics"
+    spec:
+      serviceAccountName: {{ .Values.ksaName }}
+      containers:
+        - name: serving
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8000 }
+          env:
+            - { name: GCP_PROJECT,            value: {{ .Values.gcpProject       | quote }} }
+            - { name: MODELS_BUCKET,          value: {{ .Values.modelsBucket     | quote }} }
+            - { name: MLFLOW_URI,             value: {{ .Values.mlflowUri        | quote }} }
+            - { name: MODEL_REFRESH_SECONDS,  value: {{ .Values.modelRefreshSeconds | quote }} }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+{{ toYaml .Values.resources | indent 12 }}

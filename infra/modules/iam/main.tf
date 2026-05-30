@@ -63,6 +63,19 @@ resource "google_storage_bucket_iam_member" "serving_models_read" {
   member = "serviceAccount:${google_service_account.serving.email}"
 }
 
+# Serving pulls the latest features from `btc_raw.dataset_unified` on each
+# /predict, so it needs BQ read + jobUser to run the SELECT.
+resource "google_bigquery_dataset_iam_member" "serving_bq_reader" {
+  dataset_id = var.bq_dataset
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.serving.email}"
+}
+resource "google_project_iam_member" "serving_bq_jobuser" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.serving.email}"
+}
+
 # MLflow stores all run artifacts (models, plots, JSONs) under
 # gs://<project>-mlflow/. The MLflow tracking server uploads on behalf of the
 # *caller* (the KFP train pod's WI identity), not the MLflow pod, so the

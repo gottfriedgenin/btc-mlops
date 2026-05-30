@@ -9,6 +9,7 @@ Python code that runs inside the KFP training pipeline (and is exercised by
 | [`src/features/`](./features/README.md)| [README](./features/README.md) | Drop dead columns + warmup, add derived features (returns, vol, regime, calendar), attach labels, strict time-split. |
 | [`src/train/`](./train/README.md)      | [README](./train/README.md)    | Train three XGBoost quantile regressors (P10/P50/P90), log to MLflow, ship artifacts to GCS. |
 | [`src/eval/`](./eval/README.md)        | [README](./eval/README.md)     | Band/edge metrics + 2026 holdout scorer that drives the promotion gate. |
+| [`src/serving/`](./serving/README.md)  | [README](./serving/README.md)  | Phase 5 FastAPI service. Loads Production model from MLflow, pulls live BQ features on each /predict, returns P10/P50/P90 band. |
 
 ## Dataflow
 
